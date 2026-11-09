@@ -1,0 +1,36 @@
+[project]
+name = "sketchkit"
+version = "0.0.1"
+description = "Composable hand-drawn SVG diagrams that explain one idea each"
+readme = "README.md"
+authors = [
+    { name = "rrchelbi", email = "rrchelbi+github@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.1",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["src", "examples", "tests"]
+warn_unreachable = true
+enable_error_code = ["redundant-expr", "truthy-bool", "ignore-without-code", "possibly-undefined"]
+
+[tool.pyright]
+include = ["src", "examples", "tests"]
+exclude = ["**/__pycache__", ".venv"]
+typeCheckingMode = "strict"
+reportUnnecessaryTypeIgnoreComment = "error"
+enableTypeIgnoreComments = false  # mypy reads "# type: ignore", pyright reads "# pyright: ignore"
+pythonVersion = "3.11"
