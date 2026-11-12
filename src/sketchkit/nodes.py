@@ -23,9 +23,22 @@ import random
 import zlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from typing import ClassVar, Final, Literal, Self, TypeAlias, TypedDict, TypeGuard
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Final,
+    Literal,
+    NamedTuple,
+    Self,
+    TypeAlias,
+    TypedDict,
+    TypeGuard,
+)
 
 from .core import TONES, Anchor, Canvas, FontName, Point, ToneName, is_tone
+
+if TYPE_CHECKING:
+    from .lint import Issue
 
 Style: TypeAlias = Literal["hand", "clean"]
 Theme: TypeAlias = Literal["blog", "auto", "paper"]
@@ -948,6 +961,10 @@ class Edge(ABC):
     @abstractmethod
     def bbox(self, ctx: Ctx) -> BBox: ...
 
+    def label_box(self, ctx: Ctx) -> BBox | None:
+        """Where the edge's label text sits, if it has one (used by Diagram.check)."""
+        return None
+
     @abstractmethod
     def draw(self, cv: Canvas, ctx: Ctx) -> None: ...
 
@@ -1001,15 +1018,28 @@ class Arrow(Edge):
             return (mx + 8, my + 4, "start")
         return (mx - 8, my + 4, "end")
 
+    def label_box(self, ctx: Ctx) -> BBox | None:
+        """Where the label's text sits (after layout), or None without a label."""
+        if not self.label:
+            return None
+        lx, ly, anchor = self._label_pos(self.points())
+        w = ctx.width(self.label, self.size)
+        x0 = {"middle": lx - w / 2, "start": lx, "end": lx - w}[anchor]
+        return (x0, ly - self.size * 0.8, x0 + w, ly + self.size * 0.2)
+
+    def ends(self) -> tuple[Node | None, Node | None]:
+        """The nodes this edge connects (None for a plain point)."""
+        def owner(r: Ref) -> Node | None:
+            return r if isinstance(r, Node) else r.node if isinstance(r, Port) else None
+        return owner(self.a), owner(self.b)
+
     def bbox(self, ctx: Ctx) -> BBox:
         pts = self.points()
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-        if self.label:
-            lx, ly, anchor = self._label_pos(pts)
-            w = ctx.width(self.label, self.size)
-            x0 = {"middle": lx - w / 2, "start": lx, "end": lx - w}[anchor]
-            xs += [x0, x0 + w]
-            ys += [ly - self.size, ly + 4]
+        lb = self.label_box(ctx)
+        if lb:
+            xs += [lb[0], lb[2]]
+            ys += [lb[1] - self.size * 0.2, lb[3] + 4 - self.size * 0.2]
         return (min(xs), min(ys), max(xs), max(ys))
 
     def draw(self, cv: Canvas, ctx: Ctx) -> None:
@@ -1077,6 +1107,13 @@ class Bracket(Edge):
         yb = max(f[1] + f[3] for f in frames) + self.offset
         return x0, x1, yb, yb - 12, yb + self.size + 8
 
+    def label_box(self, ctx: Ctx) -> BBox | None:
+        if not self.label:
+            return None
+        x0, x1, _, _, ly = self._geom()
+        w, cx = ctx.width(self.label, self.size, True), (x0 + x1) / 2
+        return (cx - w / 2, ly - self.size * 0.8, cx + w / 2, ly + self.size * 0.2)
+
     def bbox(self, ctx: Ctx) -> BBox:
         x0, x1, yb, _, ly = self._geom()
         w = ctx.width(self.label or "", self.size, True)
@@ -1097,6 +1134,16 @@ def _walk(n: Node, path: str = "0") -> Iterator[tuple[str, Node]]:
     yield path, n
     for i, c in enumerate(n.children()):
         yield from _walk(c, f"{path}.{i}")
+
+
+class Placed(NamedTuple):
+    """A laid-out diagram: (path, node) pairs in draw order, all edges, the context and canvas size."""
+
+    nodes: list[tuple[str, Node]]
+    edges: list[Edge]
+    ctx: Ctx
+    width: float
+    height: float
 
 
 LegendSpec: TypeAlias = "bool | Legend | Sequence[tuple[ToneRef, str]]"
@@ -1134,9 +1181,10 @@ class Diagram:
         tail = Col(*foot, gap=8).align("stretch")
         return Col(self.body, tail, gap=self.gap)
 
-    def render(self, style: Style = "hand", theme: Theme = "paper",
-               meanings: Mapping[str, MeaningSpec] | None = None, box_font: FontName | None = None) -> Canvas:
-        """Lay out and draw; returns the core Canvas (call .svg() on it, or use Diagram.svg)."""
+    def layout(self, style: Style = "hand", theme: Theme = "paper",
+               meanings: Mapping[str, MeaningSpec] | None = None, box_font: FontName | None = None) -> Placed:
+        """Measure and place everything without drawing. Every node's `.rect` is
+        set afterwards; `Diagram.check` and `render` both start here."""
         ctx = Ctx(style, theme, meanings, box_font)
         root = self._root()
         nodes = list(_walk(root))
@@ -1167,18 +1215,30 @@ class Diagram:
         dx, dy = max(0, m - x0), max(0, m - y0)
         if dx or dy:
             x0, y0, x1, y1 = place(m + dx, m + dy)
-        width, height = max(width, x1 + m), y1 + m
+        return Placed(nodes, edges, ctx, max(width, x1 + m), y1 + m)
 
+    def render(self, style: Style = "hand", theme: Theme = "paper",
+               meanings: Mapping[str, MeaningSpec] | None = None, box_font: FontName | None = None) -> Canvas:
+        """Lay out and draw; returns the core Canvas (call .svg() on it, or use Diagram.svg)."""
+        p = self.layout(style, theme, meanings, box_font)
         title = self.title or (self.headline if isinstance(self.headline, str) else None) or "diagram"
-        cv = Canvas(math.ceil(width), math.ceil(height), title, seed=self.seed, clean=ctx.clean)
-        cv.box_font = ctx.box_font
-        for path, n in nodes:
+        cv = Canvas(math.ceil(p.width), math.ceil(p.height), title, seed=self.seed, clean=p.ctx.clean)
+        cv.box_font = p.ctx.box_font
+        for path, n in p.nodes:
             cv.rnd = random.Random(zlib.crc32(f"{self.seed}/{path}".encode()))
-            n.draw(cv, ctx)
-        for i, e in enumerate(edges):
+            n.draw(cv, p.ctx)
+        for i, e in enumerate(p.edges):
             cv.rnd = random.Random(zlib.crc32(f"{self.seed}/e{i}".encode()))
-            e.draw(cv, ctx)
+            e.draw(cv, p.ctx)
         return cv
+
+    def check(self, style: Style = "hand", theme: Theme = "paper",
+              meanings: Mapping[str, MeaningSpec] | None = None, box_font: FontName | None = None) -> list[Issue]:
+        """Lay out and look for problems a reader would see: overlapping shapes,
+        arrows through boxes, labels on shapes, text wider than its box. Empty is good."""
+        from .lint import lint
+
+        return lint(self, self.layout(style, theme, meanings, box_font))
 
     def svg(self, style: Style = "hand", theme: Theme = "paper",
             meanings: Mapping[str, MeaningSpec] | None = None, box_font: FontName | None = None) -> str:

@@ -26,6 +26,25 @@ uv run pyright
 uv run python examples/demo.py --no-write --gallery out/gallery.html
 ```
 
+## For agents (and people in a hurry)
+
+```bash
+uv run python -m sketchkit guide          # how to draw good diagrams: shapes, recipes, design rules
+uv run python -m sketchkit api            # every public name and signature, generated from the code
+uv run python -m sketchkit check FILE.py  # lay out a script's diagrams and report layout problems
+```
+
+`Diagram.check()` returns `Issue`s: overlapping shapes, arrows through boxes or on top of each other, labels on shapes, text that doesn't fit, content too wide, too many colors, and a missing title or headline. Each issue names the parts involved and suggests a fix, so an agent that can't see the SVG can still correct it. Diagram scripts also accept `--check`.
+
+- [AGENTS.md](AGENTS.md) covers working on the library itself. `CLAUDE.md` imports it.
+- **Claude Code skill.** [`sketch-diagrams`](src/sketchkit/skills/sketch-diagrams/SKILL.md) walks Claude Code through illustrating a Markdown document: load the guide, pick a shape, write the script, check it, insert it. It ships in the package. To add it to a project, run this from the project's folder:
+
+  ```bash
+  uv run python -m sketchkit skill --install            # writes .claude/skills/sketch-diagrams/SKILL.md
+  ```
+
+  `skill` alone prints it. `--install DIR` writes it somewhere else, such as `~/.claude/skills` for every project. An installed copy you've edited is only replaced with `--force`.
+
 ## Types
 
 The package ships `py.typed`. It passes both mypy `--strict` and pyright `strict`.

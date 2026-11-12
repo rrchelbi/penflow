@@ -25,6 +25,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NamedTuple, TypeAlias, TypeVar
 
 from .core import Canvas, FontName, escape, figure, insert
+from .lint import Issue
 from .nodes import Diagram, MeaningSpec, Style, Theme
 
 Drawing: TypeAlias = Diagram | Canvas
@@ -86,6 +87,17 @@ class Doc:
         return [Rendered(e.id, e.caption, e.anchor, to_svg(e.build(), st, th, self.meanings, self.box_font))
                 for e in self.diagrams]
 
+    def check(self, style: Style | None = None, theme: Theme | None = None) -> list[tuple[str, Issue]]:
+        """Run Diagram.check on every diagram: [(diagram id, issue)]. Hand-drawn
+        Canvas builders are skipped (they have no layout to check)."""
+        st, th = style or self.style, theme or self.theme
+        out: list[tuple[str, Issue]] = []
+        for e in self.diagrams:
+            drawing = e.build()
+            if isinstance(drawing, Diagram):
+                out += [(e.id, i) for i in drawing.check(st, th, self.meanings, self.box_font)]
+        return out
+
     def build(self, rendered: Sequence[Rendered] | None = None, write: bool = True) -> str:
         """Insert the figures into the file, keeping its line endings. Returns the new text."""
         items = self.render() if rendered is None else rendered
@@ -128,6 +140,7 @@ class _Args(argparse.Namespace):
     gallery: pathlib.Path | None
     no_write: bool
     clean: bool
+    check: bool
     theme: Theme | None
 
 
@@ -138,6 +151,7 @@ def run(*docs: Doc, argv: Sequence[str] | None = None) -> None:
       --no-write       don't touch the Markdown files
       --clean          straight lines instead of the pen look
       --theme T        paper, auto or blog (default: each doc's own)
+      --check          also report layout problems (see Diagram.check)
     """
     ap = argparse.ArgumentParser(description="Render diagrams into Markdown posts.")
     ap.add_argument("--preview", type=pathlib.Path)
@@ -145,6 +159,7 @@ def run(*docs: Doc, argv: Sequence[str] | None = None) -> None:
     ap.add_argument("--no-write", action="store_true")
     ap.add_argument("--clean", action="store_true")
     ap.add_argument("--theme", choices=["paper", "auto", "blog"])
+    ap.add_argument("--check", action="store_true")
     a = ap.parse_args(argv, namespace=_Args())
     every: list[Rendered] = []
     for doc in docs:
@@ -154,8 +169,25 @@ def run(*docs: Doc, argv: Sequence[str] | None = None) -> None:
             for r in rendered:
                 (a.preview / f"{r.id}.svg").write_text(r.svg, encoding="utf-8", newline="\n")
         every += rendered
+        if a.check:
+            report(doc.check(style="clean" if a.clean else None, theme=a.theme), doc.path.name)
         if not a.no_write:
             doc.build(rendered)
             print(f"{doc.path}: {len(rendered)} diagram(s)")
     if a.gallery:
         print("gallery:", gallery(every, a.gallery))
+
+
+def report(issues: Sequence[tuple[str, Issue]], where: str = "") -> int:
+    """Print issues grouped by diagram; returns how many are errors."""
+    prefix = f"{where}: " if where else ""
+    if not issues:
+        print(f"{prefix}no layout issues")
+        return 0
+    current = None
+    for sid, issue in issues:
+        if sid != current:
+            print(f"{prefix}{sid}")
+            current = sid
+        print("  " + str(issue).replace("\n", "\n  "))
+    return sum(i.level == "error" for _, i in issues)
