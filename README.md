@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img src="docs/logo.svg" alt="sketchkit: hand-drawn diagrams from code" width="440">
+  </picture>
+</p>
+
 # sketchkit
 
 Composable hand-drawn SVG diagrams, one idea per drawing. Pure Python, no dependencies.
