@@ -43,7 +43,7 @@ uv run python -m sketchkit check FILE.py  # lay out a script's diagrams and repo
 
 `Diagram.check()` returns `Issue`s: overlapping shapes, arrows through boxes or on top of each other, labels on shapes, text that doesn't fit, content too wide, too many colors, and a missing title or headline. Each issue names the parts involved and suggests a fix, so an agent that can't see the SVG can still correct it. Diagram scripts also accept `--check`.
 
-- [AGENTS.md](AGENTS.md) covers working on the library itself. `CLAUDE.md` imports it.
+- [AGENTS.md](AGENTS.md) covers working on the library itself. `CLAUDE.md` imports it. [CONTRIBUTING.md](CONTRIBUTING.md) covers issues and pull requests.
 - **Claude Code skill.** [`sketch-diagrams`](src/sketchkit/skills/sketch-diagrams/SKILL.md) walks Claude Code through illustrating a Markdown document: load the guide, pick a shape, write the script, check it, insert it. It ships in the package. To add it to a project, run this from the project's folder:
 
   ```bash
