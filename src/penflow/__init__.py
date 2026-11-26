@@ -1,6 +1,6 @@
-"""sketchkit: composable hand-drawn SVG diagrams that explain one idea each.
+"""penflow: composable hand-drawn SVG diagrams that explain one idea each.
 
-    from sketchkit import *
+    from penflow import *
 
     a, b = Box("client"), Box("server")
     svg = Diagram(Row(a, b, gap=90), edges=[Arrow(a, b, "request")],
@@ -8,7 +8,7 @@
 
 Layers: `core` (the pen and the canvas), `nodes` (composable parts and layout),
 `ideas` (common explanation shapes built from nodes), `lint` (layout checks),
-`publish` (Markdown). For agents: `python -m sketchkit guide`.
+`publish` (Markdown). For agents: `python -m penflow guide`.
 """
 
 from .core import (
@@ -24,6 +24,7 @@ from .core import (
     figure,
     insert,
 )
+from .dsl import Sketch, SketchDoc, SketchError, parse_sketch
 from .ideas import (
     BoxSpec,
     CellSpec,
@@ -42,6 +43,7 @@ from .ideas import (
     timeline,
 )
 from .lint import Issue
+from .mermaid import Converted, convert_mermaid
 from .nodes import (
     DEFAULT_MEANINGS,
     Act,
@@ -113,7 +115,6 @@ __all__ = [
     "Bracket",
     "BracketSide",
     "Builder",
-    # core
     "Canvas",
     "Cell",
     "CellSpec",
@@ -121,7 +122,12 @@ __all__ = [
     "Circle",
     "Col",
     "Diagram",
-    # publish
+    "Sketch",
+    "SketchDoc",
+    "SketchError",
+    "Converted",
+    "convert_mermaid",
+    "parse_sketch",
     "Doc",
     "Dot",
     "Drawing",
@@ -132,7 +138,6 @@ __all__ = [
     "Gap",
     "Grid",
     "Headline",
-    # checks
     "Issue",
     "ItemSpec",
     "Justify",
@@ -147,7 +152,6 @@ __all__ = [
     "MarkKind",
     "MeaningSpec",
     "Msg",
-    # nodes
     "Node",
     "Note",
     "Overlay",
@@ -172,7 +176,6 @@ __all__ = [
     "TextAlign",
     "Theme",
     "TickMark",
-    # types
     "ToneName",
     "ToneRef",
     "Track",
@@ -180,7 +183,6 @@ __all__ = [
     "compare",
     "escape",
     "figure",
-    # ideas
     "flow",
     "gallery",
     "hub",

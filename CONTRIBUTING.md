@@ -1,20 +1,20 @@
-# Contributing to sketchkit
+# Contributing to Penflow
 
-Thanks for helping. sketchkit is small on purpose: pure Python, no runtime dependencies, one idea per drawing. Contributions that keep it that way are the easiest to merge.
+Thanks for helping. Penflow is small on purpose: pure Python, no runtime dependencies, one idea per drawing. Contributions that keep it that way are the easiest to merge.
 
 ## Before you start
 
-- **Bugs:** open an issue with the smallest script that shows the problem, the SVG it produced (or a screenshot), and what you expected. If `python -m sketchkit check` reports something wrong, or misses something, include its output.
+- **Bugs:** open an issue with the smallest script that shows the problem, the SVG it produced (or a screenshot), and what you expected. If `python -m penflow check` reports something wrong, or misses something, include its output.
 - **New features:** open an issue first for anything bigger than a fix, such as a new node, idea or check. A short sketch of the API you have in mind is enough. It saves you writing code that doesn't fit.
 - **Small fixes** (typos, docs, clear bugs) can go straight to a pull request.
 
 ## Setup
 
-sketchkit uses [uv](https://docs.astral.sh/uv/), not pip.
+Penflow uses [uv](https://docs.astral.sh/uv/), not pip.
 
 ```bash
-git clone git@github.com:rrchelbi/sketchkit.git
-cd sketchkit
+git clone git@github.com:rrchelbi/penflow.git
+cd penflow
 uv sync            # creates .venv with pytest, mypy and pyright
 ```
 
@@ -28,7 +28,7 @@ Run all of these before opening a pull request. A change isn't done until they a
 uv run pytest                                                         # tests, including every code block in guide.md
 uv run mypy                                                           # strict
 uv run pyright                                                        # strict
-uv run python -m sketchkit check examples/demo.py --gallery out/check.html
+uv run python -m penflow check examples/demo.py --gallery out/check.html
 ```
 
 Then open `out/check.html` and look at the diagrams. Text widths are estimated rather than measured, so the checker can't catch everything. If your change affects drawing, say in the pull request which diagrams you looked at.
@@ -41,11 +41,11 @@ Then open `out/check.html` and look at the diagrams. Text widths are estimated r
 - **Types stay strict** in both mypy and pyright. Options are `Literal` aliases and modifiers return `Self`. Use `# pyright: ignore[rule]` and `# type: ignore[code]`, never a bare ignore.
 - **Keep drawing stable.** Randomness is seeded per node, so editing one box doesn't redraw the others. Don't add `rnd` calls to existing draw methods unless you mean to change every existing diagram's wobble, and say so in the pull request if you do.
 - **Errors say what to do.** User mistakes raise `ValueError` with a message that names the fix.
-- **Docs move with the code.** If you change a public signature or behaviour, update `src/sketchkit/guide.md`, the skill (`src/sketchkit/skills/sketch-diagrams/SKILL.md`) and the README. The guide's code blocks run as tests, so stale examples fail.
+- **Docs move with the code.** If you change a public signature or behaviour, update `docs/guide.md`, the skill (`skills/penflow-diagrams/SKILL.md`) and the README, and for the DSL `docs/language.md`. The examples in the guide and in `docs/mermaid.md` run as tests, so stale examples fail.
 
 ## Tests
 
-- Node and layout tests live in `tests/test_nodes.py`. The CLI, guide and skill are tested in `tests/test_agents.py`.
+- Node and layout tests live in `tests/test_nodes.py`, the DSL in `tests/test_dsl.py`, Mermaid conversion in `tests/test_mermaid.py`. The CLI, guide and skill are tested in `tests/test_agents.py`.
 - A new check needs a test that builds the bad diagram and expects the check's code.
 - Prefer asserting on layout (`node.rect`) and `check()` issues over comparing whole SVG strings, which change whenever the drawing does.
 

@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from sketchkit import (
+from penflow import (
     Act,
     Arrow,
     Box,
@@ -75,7 +75,7 @@ def test_canvas_grows_to_fit_edge_labels_left_of_content() -> None:
     a, b = Box("a"), Box("b")
     e = Arrow(a, b, "a very long label on the left", label_side="left")
     cv = Diagram(Col(a, b, gap=80), edges=[e], width=None).render()
-    from sketchkit.nodes import Ctx
+    from penflow.nodes import Ctx
     x0, _, _, _ = e.bbox(Ctx())
     assert x0 >= 20 - 0.01  # shifted right so the label stays inside the margin
     assert a.rect[0] > 100 and cv.w >= a.rect[0] + a.rect[2] + 20

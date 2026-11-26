@@ -1,11 +1,18 @@
-# sketchkit guide (for agents and people)
+# Penflow guide (for agents and people)
 
-sketchkit draws hand-drawn SVG diagrams from Python. You describe *what* is in the picture: boxes, rows, arrows between named things. The library works out *where* everything goes. There are no coordinates.
+Penflow draws hand-drawn SVG diagrams. You describe *what* is in the picture: boxes, rows, arrows between named things. The library works out *where* everything goes. There are no coordinates.
+
+There are two ways to write a diagram, and they draw the same thing:
+
+- **A ` ```penflow ` fence in the Markdown post**, in a short text format that borrows Mermaid's syntax. It's the quickest to write and costs the fewest tokens. See [Penflow fences](#penflow-fences) at the end.
+- **Python**, for diagrams built by code: a part whose structure changes from case to case, or a drawing computed from data. Most of this guide shows Python, and every Python shape has a Penflow block.
 
 ```bash
-python -m sketchkit guide        # this text
-python -m sketchkit api          # every public name and signature, generated from the code
-python -m sketchkit check FILE   # lay out every diagram in a script and list layout problems
+python -m penflow guide           # this text
+python -m penflow api             # every public name and signature, generated from the code
+python -m penflow check FILE      # lay out every diagram in a script or .md file and list layout problems
+python -m penflow render POST.md  # draw a post's penflow fences into it
+python -m penflow convert FILE    # Mermaid in, penflow fences out
 ```
 
 ## The loop
@@ -15,30 +22,30 @@ You usually can't see the picture, so work like this:
 1. **Write the idea in one sentence** before writing any code. That sentence becomes the `headline`. If you can't write it, the diagram isn't ready.
 2. **Pick the shape** that matches the idea (see the table below), and start from its recipe.
 3. **Write the code.** Name every node you will point an arrow at.
-4. **Check it**, with `d.check()` or `python -m sketchkit check script.py`. Fix every `error`. Fix `warn` items unless you have a reason not to. Each issue says which parts are involved and how to fix it.
+4. **Check it**, with `d.check()` or `python -m penflow check script.py`. Fix every `error`. Fix `warn` items unless you have a reason not to. Each issue says which parts are involved and how to fix it.
 5. **Look at it if you can.** Use `--gallery out.html` and open the page, or view the SVG. `check` finds geometry problems; it can't tell whether the drawing explains anything.
 
 ## Pick the shape
 
-| The idea is... | Use | Example |
-|---|---|---|
-| a pipeline, cause → effect, a sequence of stages | `flow(...)` | source → compile → binary |
-| who sends what to whom, in what order | `sequence(lanes, Msg(...), Act(...))` | client, server, database |
-| when things happened, durations, gaps | `timeline((t, "text"), ...)` | an incident timeline |
-| layers that sit on top of each other | `stack(...)` | app / runtime / kernel |
-| before vs after, case A vs case B | `compare((title, body), ...)` | two failure cases |
-| items × properties, status of many things | `table(rows, header=...)` | threats and their status |
-| which items belong to which group, intersections | `overlap(items, sets...)` | two quorums sharing a node |
-| one thing talking to many | `hub(center, spokes)` | a leader and its followers |
-| an ordered list of actions | `steps(...)` | ① propose ② replicate ③ commit |
-| something else | build it from `Row`, `Col`, `Grid`, `Region` and `Arrow` | |
+| The idea is... | Python | Penflow block | Example |
+|---|---|---|---|
+| a pipeline, cause → effect, a sequence of stages | `flow(...)` | `flow lr` / `flow td` | source → compile → binary |
+| who sends what to whom, in what order | `sequence(lanes, Msg(...), Act(...))` | `sequence_diagram` | client, server, database |
+| when things happened, durations, gaps | `timeline((t, "text"), ...)` | `timeline` | an incident timeline |
+| layers that sit on top of each other | `stack(...)` | `stack` | app / runtime / kernel |
+| before vs after, case A vs case B | `compare((title, body), ...)` | `compare` + `panel` | two failure cases |
+| items × properties, status of many things | `table(rows, header=...)` | `table` | threats and their status |
+| which items belong to which group, intersections | `overlap(items, sets...)` | `overlap` + `set` | two quorums sharing a node |
+| one thing talking to many | `hub(center, spokes)` | `hub` | a leader and its followers |
+| an ordered list of actions | `steps(...)` | `steps` | ① propose ② replicate ③ commit |
+| something else | `Row`, `Col`, `Grid`, `Region`, `Arrow` | `row`, `col`, `grid`, `region`, edge lines | |
 
 Every shape returns an ordinary node, so they nest. You can put a `flow` inside a `Region`, two `stack`s inside a `compare`, and so on.
 
 ## Minimal example
 
 ```python
-from sketchkit import *
+from penflow import *
 
 client, server = Box("client"), Box("server", "checks the token")
 d = Diagram(
@@ -61,7 +68,7 @@ Two arrows between the same pair of boxes would be drawn on the same line, so gi
 ### A pipeline with a highlighted step
 
 ```python
-from sketchkit import *
+from penflow import *
 
 d = Diagram(
     flow(("compile", "clang -O2"), Box("verifier", "can say no").tone("bad"), "kernel",
@@ -76,7 +83,7 @@ d = Diagram(
 ### Who talks to whom
 
 ```python
-from sketchkit import *
+from penflow import *
 
 d = Diagram(
     sequence(
@@ -99,7 +106,7 @@ d = Diagram(
 ### A timeline
 
 ```python
-from sketchkit import *
+from penflow import *
 
 d = Diagram(
     timeline((0, "deploy"), (40, "errors start", "bad"), (95, "rollback"), (130, "recovered", "good")),
@@ -113,7 +120,7 @@ Labels alternate above and below the axis. For full control, pass `At(value, ite
 ### Two cases side by side, built from a function
 
 ```python
-from sketchkit import *
+from penflow import *
 
 def case(leader_alive: bool) -> Col:
     leader = Box("leader", "alive" if leader_alive else "crashed").tone("good" if leader_alive else "bad")
@@ -136,7 +143,7 @@ A function that returns a node is how you reuse a part. `.link(...)` attaches it
 ### Groups, tables, sets
 
 ```python
-from sketchkit import *
+from penflow import *
 
 nodes = Row(*[Region(f"node {i}", stack("agent", "kernel")) for i in (1, 2, 3)], gap=16)
 threats = table([["replay", ("open", "bad")], ["flood", ("fixed", "good")]], header=["threat", "status"])
@@ -196,7 +203,7 @@ Some mistakes `check` can't see:
 
 ```python
 import pathlib, tempfile
-from sketchkit import *
+from penflow import *
 
 post = pathlib.Path(tempfile.mkdtemp()) / "post.md"
 post.write_text("# Raft\n\n<!-- sketch: commit -->\n", encoding="utf-8")
@@ -214,4 +221,152 @@ assert 'data-sketch="commit"' in post.read_text(encoding="utf-8")
 
 A diagram goes after the line `<!-- sketch: <id> -->`. Re-running the script replaces it, so edit the code and run again. The script options are `--check`, `--no-write`, `--preview DIR`, `--gallery FILE`, `--clean` (straight lines) and `--theme paper|auto|blog`.
 
-To check a whole script from outside, without writing anything, use `python -m sketchkit check script.py --gallery out/check.html`.
+To check a whole script from outside, without writing anything, use `python -m penflow check script.py --gallery out/check.html`.
+
+## Penflow fences
+
+A ` ```penflow ` fence holds one diagram, written where it appears in the post. `python -m penflow render post.md` draws every fence and puts the figure right after it. Re-running replaces the figures, so edit the fence and render again. The full syntax is in `docs/language.md` in the Penflow repository. Everything below is enough for most diagrams.
+
+The minimal example from the top of this guide, as a fence:
+
+```penflow
+---
+headline: the server checks every request, not just the first
+title: A client sends a request with a token; the server checks it and answers 403 when it is invalid.
+---
+row {gap: 120}
+  client
+  server[server | checks the token]
+client.at(1, 0.3) -->|request + token| server.at(0, 0.3)
+server.at(0, 0.7) -->|403| client.at(1, 0.7) :::bad {label_side: below}
+```
+
+### The syntax in one table
+
+Every word the DSL defines is snake_case, and so are ids.
+
+| you write | you get |
+|---|---|
+| `---` front matter `---` | `headline:`, `note:`, `title:`, `legend: true`, `meanings: {loyal: cyan}`, `id:`, `caption:` |
+| `client` | a box titled "client" (`ring_buffer` reads "ring buffer") |
+| `a[title \| second line]`, `n((N1))`, `t(open)` | a box with two lines, a circle, a table cell |
+| `label some text`, `spacer {h: 20}` | a label, a gap |
+| `:::bad` at the end of a node or edge | its meaning (tone) |
+| `{size: 13, dashed, w: 200}` at the end | attributes: the Python keyword arguments |
+| `a --> b`, `a -->\|label\| b`, `a -.-> b`, `a --- b`, `a --> b --> c` | arrows, a label, dashed, no head, a chain |
+| `a.bottom --> b.at(0, 0.3)` | ports |
+| `row {gap: 50}`, `col`, `split`, `region title`, `pad {bottom: 46}`, `grid`, `overlay` | layout blocks: indent the children by 2 spaces |
+| `%% text` | a comment |
+
+A node is placed where it's first written. After that, refer to it by id alone. An edge at the top level, after the body, is a diagram edge. An edge inside a block belongs to that block.
+
+### A pipeline with a highlighted step
+
+```penflow
+---
+headline: the verifier is the step that says no
+title: Code is compiled to bytecode, checked by the verifier, and only reaches the kernel if it is safe.
+---
+flow lr
+  compile[compile | clang -O2] -->|bytecode| verifier[verifier | can say no]:::bad -->|if safe| kernel
+```
+
+`flow` sizes its gaps for the labels. It also lays out flows that branch, merge and loop: a retry edge back to an earlier step is drawn around the flow. Use `flow td` for more than four steps.
+
+### Who talks to whom
+
+```penflow
+---
+headline: a write is committed once a majority has it
+title: The client sends put to the leader, the leader appends to the follower, the follower acks, the leader commits and answers ok.
+---
+sequence_diagram
+  participant client
+  participant leader:::good
+  participant follower
+  client ->> leader: ① put x=1
+  leader ->> follower: ② append
+  follower ->> leader: ③ ack :::good
+  note leader: ④ commit: a majority has it :::good
+  leader ->> client: ⑤ ok
+```
+
+`a -x b: text` ends the message in a cross, and `{mark: check}` puts a check there. `note lane: text {bar: 3}` draws a thick line on the lifeline over 3 rows. `gap` adds a row of space.
+
+### A timeline
+
+```penflow
+---
+headline: 90 seconds of errors before anyone rolled back
+title: Deploy at 0 s, errors from 40 s, rollback at 95 s, recovered at 130 s.
+---
+timeline
+  0: deploy
+  40: errors start :::bad
+  95: rollback
+  130: recovered :::good
+```
+
+### Two cases side by side, with a template
+
+```penflow
+---
+headline: no heartbeats → the followers start an election
+legend: true
+title: Left, a live leader sends heartbeats to two followers. Right, the leader crashed and sends nothing.
+---
+template case(state, tone)
+  col {gap: 50}
+    leader[leader | $state]:::$tone
+    row {gap: 40}
+      f1
+      f2
+  leader --> f1 :::$tone
+  leader --> f2 :::$tone
+compare
+  panel normal
+    use case as live {state: alive, tone: good}
+  panel leader crash :::bad
+    use case as dead {state: crashed, tone: bad}
+```
+
+A template is a part you write once and place several times. `$param` fills in text, tones and attribute values, never ids or keywords. Each `use ... as name` gets its own ids (`live_leader`, `dead_f1`) and its own edges. A part whose *structure* changes between cases belongs in Python.
+
+### Groups, tables, sets
+
+```penflow
+---
+headline: three shapes in one column
+title: Two nodes each running an agent on a kernel, a two-row threat table, and two overlapping majorities.
+---
+col {gap: 28}
+  row {gap: 16}
+    region node 1
+      stack
+        agent_1[agent]
+        kernel_1[kernel]
+    region node 2
+      stack
+        agent_2[agent]
+        kernel_2[kernel]
+  table
+    | threat | status |
+    |---|---|
+    | replay | open :::bad |
+    | flood | fixed :::good |
+  overlap
+    n1[N1] n2[N2] n3[N3]:::good n4[N4] n5[N5]
+    set n1..n3: majority A :::normal
+    set n3..n5: majority B :::wait {side: bottom}
+```
+
+### Check, render, repeat
+
+```bash
+python -m penflow check post.md --gallery out/post.html   # problems by id and line, and a page to look at
+python -m penflow render post.md                          # draw the fences into the post
+```
+
+`check` names the id and the line of each part involved, and says the fix in DSL terms ("add `{route: hv}` to the edge line"). Mistakes in the text itself, such as an unknown attribute, a camelCase id or a node declared twice, stop with the line and the fix.
+
+**Coming from Mermaid:** `python -m penflow convert post.md --write` turns the post's ` ```mermaid ` fences into penflow fences, and lists in comments anything it approximated. `render post.md --mermaid` draws Mermaid fences without changing them. See `docs/mermaid.md` in the Penflow repository.

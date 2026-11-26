@@ -5,7 +5,7 @@ a line twice. Colors are CSS classes (stroke-<tone>, t-<tone>, fill-<tone>...)
 that either a site stylesheet themes (`svg()`) or that get styled in place
 (`svg(inline=True, palette=...)`) for Markdown readers such as Obsidian.
 
-The composable API in `sketchkit.nodes` draws on this canvas. Use it directly
+The composable API in `penflow.nodes` draws on this canvas. Use it directly
 for hand-placed drawings; its output is kept byte-for-byte stable.
 """
 
@@ -27,9 +27,6 @@ Point: TypeAlias = tuple[float, float]
 def escape(s: str) -> str:
     """Escape text for SVG/HTML content."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-_esc = escape  # the original name
 
 
 # Tones from the site logo. Each: (light ink, light tint), (dark ink, dark tint).
@@ -55,17 +52,16 @@ def _tone_style(names: list[ToneName]) -> str:
         return "".join(f"--sk-{n}:{TONES[n][i][0]};--sk-{n}-bg:{TONES[n][i][1]};" for n in names)
 
     css = [f":where(svg){{{vars_(0)}}}",
-           f"@media (prefers-color-scheme:dark){{:where(:root:not(.light):not([data-theme=light])) :where(svg){{{vars_(1)}}}}}",
+           "@media (prefers-color-scheme:dark){"
+           f":where(:root:not(.light):not([data-theme=light])) :where(svg){{{vars_(1)}}}}}",
            f":where(.dark,[data-theme=dark]) :where(svg){{{vars_(1)}}}"]
-    for n in names:
-        css.append(f"svg path.stroke-{n}{{fill:none;stroke:var(--sk-{n});stroke-width:1.8;"
-                   f"stroke-linecap:round;stroke-linejoin:round}}"
-                   f"svg text.t-{n}{{fill:var(--sk-{n})}}svg path.fill-{n}{{fill:var(--sk-{n}-bg)}}"
-                   f"svg circle.solid-{n}{{fill:var(--sk-{n})}}")
+    css += [f"svg path.stroke-{n}{{fill:none;stroke:var(--sk-{n});stroke-width:1.8;"
+            f"stroke-linecap:round;stroke-linejoin:round}}"
+            f"svg text.t-{n}{{fill:var(--sk-{n})}}svg path.fill-{n}{{fill:var(--sk-{n}-bg)}}"
+            f"svg circle.solid-{n}{{fill:var(--sk-{n})}}" for n in names]
     return "<style>" + "".join(css) + "</style>"
 
 
-# ---- inline mode -----------------------------------------------------------
 # For Markdown readers that strip <style> and have no .sketch CSS (Obsidian,
 # GitHub, VS Code): every element gets a style attribute instead.
 #
@@ -116,7 +112,8 @@ def _inline_styles(pal: Palette) -> tuple[dict[str, str], str, str]:
         return f"var(--sk-{name},{val})"
 
     line = (f"fill:none;stroke-width:{pal['width']};stroke-linecap:round;stroke-linejoin:round;stroke:")
-    ink, soft, acc, surf = v("ink", pal["ink"]), v("soft", pal["soft"]), v("accent", pal["accent"]), v("surface", pal["surface"])
+    ink, soft = v("ink", pal["ink"]), v("soft", pal["soft"])
+    acc, surf = v("accent", pal["accent"]), v("surface", pal["surface"])
     st = {"stroke": line + ink, "stroke-soft": line + soft, "stroke-accent": line + acc,
           "t-soft": "fill:" + soft, "t-accent": "fill:" + acc,
           "fill-surface": "fill:" + surf, "fill-accent": "fill:" + acc, "t-ink": "fill:" + ink}
@@ -154,7 +151,6 @@ class Canvas:
         self.rnd = random.Random(seed)
         self.out: list[str] = []
 
-    # ---- primitives ------------------------------------------------------
     def j(self, a: float) -> float:
         return 0.0 if self.clean else self.rnd.uniform(-a, a)
 
@@ -197,7 +193,7 @@ class Canvas:
             f += ' data-halo="1"'
         self.out.append(
             f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" font-weight="{weight}"{f} '
-            f'text-anchor="{anchor}" transform="rotate({rot:.2f} {x:.1f} {y:.1f})"{c}>{_esc(s)}</text>'
+            f'text-anchor="{anchor}" transform="rotate({rot:.2f} {x:.1f} {y:.1f})"{c}>{escape(s)}</text>'
         )
 
     def fill_rect(self, x: float, y: float, w: float, h: float, cls: str = "fill-surface") -> None:
@@ -284,7 +280,6 @@ class Canvas:
         self.line(x - s, y - s, x + s, y + s, cls, rough=0.8, passes=1)
         self.line(x + s, y - s, x - s, y + s, cls, rough=0.8, passes=1)
 
-    # ---- composites ------------------------------------------------------
     def box(self, x: float, y: float, w: float, h: float, title: str, sub: str | None = None, accent: bool = False,
             size: float = 18, sub_size: float = 14, dashed: bool = False, tone: ToneName | None = None) -> None:
         """`tone` (a TONES name: orange, cyan, rust, slate) tints the fill and colors
@@ -333,21 +328,18 @@ class Canvas:
             font = "font-family=\"Inter, 'Segoe UI', system-ui, -apple-system, sans-serif\" "
         return (
             f'<svg viewBox="0 0 {self.w} {self.h}" xmlns="http://www.w3.org/2000/svg" role="img" {font}'
-            f'aria-labelledby="{tid}"><title id="{tid}">{_esc(self.title)}</title>'
+            f'aria-labelledby="{tid}"><title id="{tid}">{escape(self.title)}</title>'
             + head
             + body
             + "</svg>"
         )
 
 
-Sketch = Canvas  # the name used by the original scripts
-
-
 def figure(sketch_id: str, svg: str, caption: str) -> str:
     """The Markdown-embeddable block. `data-sketch` lets the inserter replace it later."""
     return (
         f'<figure class="sketch not-prose" data-sketch="{sketch_id}">\n{svg}\n'
-        f"<figcaption>{_esc(caption)}</figcaption>\n</figure>"
+        f"<figcaption>{escape(caption)}</figcaption>\n</figure>"
     )
 
 
