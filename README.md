@@ -7,6 +7,8 @@
 
 # Penflow
 
+[![CI](https://github.com/rrchelbi/penflow/actions/workflows/ci.yml/badge.svg)](https://github.com/rrchelbi/penflow/actions/workflows/ci.yml)
+
 Composable hand-drawn SVG diagrams, one idea per drawing. Pure Python, no dependencies.
 
 ```python

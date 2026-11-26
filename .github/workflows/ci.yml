@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Labels use ①, → and curly quotes; Windows runners default to cp1252.
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python: "3.14"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest
+
+  checks:
+    name: types, lint and examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - run: uv sync --locked
+      - name: mypy
+        run: uv run mypy
+      - name: pyright
+        run: uv run pyright
+      - name: ruff
+        run: uv run ruff check --output-format=github
+      - name: check the examples
+        run: |
+          uv run penflow check examples/demo.py
+          uv run penflow check examples/demo_penflow.md
+
+  package:
+    name: build and install the wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.14"
+          enable-cache: true
+      - run: uv build
+      # Run from outside the checkout, so the guide and skill must come from the wheel itself.
+      - name: install the wheel in a clean environment and run it
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          uv venv wheel-test
+          uv pip install --python wheel-test "$GITHUB_WORKSPACE"/dist/*.whl
+          wheel-test/bin/penflow guide > guide.txt && grep -q "Penflow guide" guide.txt
+          wheel-test/bin/penflow skill > skill.txt && grep -q "name: penflow-diagrams" skill.txt
+          wheel-test/bin/penflow skill --install skills && test -f skills/penflow-diagrams/SKILL.md
+          wheel-test/bin/python -c "import penflow; assert penflow.parse_sketch('a --> b').diagram.svg().startswith('<svg')"
