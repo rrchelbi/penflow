@@ -111,7 +111,7 @@ class Doc:
         return md
 
 
-def gallery(items: Iterable[Rendered], path: str | os.PathLike[str], title: str = "sketchkit gallery") -> pathlib.Path:
+def gallery(items: Iterable[Rendered], path: str | os.PathLike[str], title: str = "penflow gallery") -> pathlib.Path:
     """Write one HTML page with every diagram, for reviewing them together."""
     figs = "\n".join(
         f'<figure id="{html.escape(r.id)}"><div class="art">{r.svg}</div>'

@@ -1,16 +1,16 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
-    <img src="docs/logo.svg" alt="sketchkit: hand-drawn diagrams from code" width="440">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img src="docs/assets/logo.svg" alt="Penflow: hand-drawn diagrams from code" width="440">
   </picture>
 </p>
 
-# sketchkit
+# Penflow
 
 Composable hand-drawn SVG diagrams, one idea per drawing. Pure Python, no dependencies.
 
 ```python
-from sketchkit import *
+from penflow import *
 
 a, b = Box("client"), Box("server")
 svg = Diagram(
@@ -25,7 +25,7 @@ You never write coordinates. Boxes size themselves from their text, containers p
 ## Setup (uv)
 
 ```bash
-cd sketchkit
+cd penflow
 uv sync
 uv run pytest
 uv run mypy
@@ -36,21 +36,46 @@ uv run python examples/demo.py --no-write --gallery out/gallery.html
 ## For agents (and people in a hurry)
 
 ```bash
-uv run python -m sketchkit guide          # how to draw good diagrams: shapes, recipes, design rules
-uv run python -m sketchkit api            # every public name and signature, generated from the code
-uv run python -m sketchkit check FILE.py  # lay out a script's diagrams and report layout problems
+uv run python -m penflow guide          # how to draw good diagrams: shapes, recipes, design rules
+uv run python -m penflow api            # every public name and signature, generated from the code
+uv run python -m penflow check FILE.py  # lay out a script's diagrams and report layout problems
 ```
 
 `Diagram.check()` returns `Issue`s: overlapping shapes, arrows through boxes or on top of each other, labels on shapes, text that doesn't fit, content too wide, too many colors, and a missing title or headline. Each issue names the parts involved and suggests a fix, so an agent that can't see the SVG can still correct it. Diagram scripts also accept `--check`.
 
 - [AGENTS.md](AGENTS.md) covers working on the library itself. `CLAUDE.md` imports it. [CONTRIBUTING.md](CONTRIBUTING.md) covers issues and pull requests.
-- **Claude Code skill.** [`sketch-diagrams`](src/sketchkit/skills/sketch-diagrams/SKILL.md) walks Claude Code through illustrating a Markdown document: load the guide, pick a shape, write the script, check it, insert it. It ships in the package. To add it to a project, run this from the project's folder:
+- **Claude Code skill.** [`penflow-diagrams`](skills/penflow-diagrams/SKILL.md) walks Claude Code through illustrating a Markdown document: load the guide, pick a shape, write a Penflow fence (or a script), check it, render it. It ships in the package. To add it to a project, run this from the project's folder:
 
   ```bash
-  uv run python -m sketchkit skill --install            # writes .claude/skills/sketch-diagrams/SKILL.md
+  uv run python -m penflow skill --install            # writes .claude/skills/penflow-diagrams/SKILL.md
   ```
 
   `skill` alone prints it. `--install DIR` writes it somewhere else, such as `~/.claude/skills` for every project. An installed copy you've edited is only replaced with `--force`.
+
+## Penflow fences (experimental)
+
+Diagrams can also be written in the Markdown post itself, in a snake_case text format that borrows Mermaid's syntax:
+
+````markdown
+```penflow
+---
+headline: one request, one answer
+---
+row {gap: 90}
+  client
+  server[server | handles it]
+client -->|request| server
+```
+````
+
+```bash
+uv run python -m penflow render post.md   # puts each figure right after its fence; re-run to update
+uv run python -m penflow check post.md    # reports problems by id and file line
+```
+
+Coming from Mermaid? `python -m penflow convert post.md --write` turns a post's ` ```mermaid ` fences into ` ```penflow ` fences, and `render post.md --mermaid` draws them without changing them. Flowcharts (with subgraphs and classes), sequence diagrams and timelines convert, and anything approximated is listed as a comment. [docs/mermaid.md](docs/mermaid.md) shows them side by side.
+
+Everything in the Python API's idea shapes works: layout blocks, `flow`, `stack`, `steps`, `hub`, `compare`, `table`, `overlap`, `timeline`, `sequence_diagram`, and templates for parts you use twice. [examples/demo_penflow.md](examples/demo_penflow.md) draws the same SVGs as [examples/demo.py](examples/demo.py). Flows can branch, merge and loop, as in Mermaid flowcharts. The full design is in [docs/language.md](docs/language.md).
 
 ## Types
 
@@ -63,7 +88,7 @@ The package ships `py.typed`. It passes both mypy `--strict` and pyright `strict
 - **Meaning names you define (`"traitor"`) are plain strings**, so the type checker can't check them. They are checked when the diagram renders, and an unknown name raises an error listing the known ones.
 
 
-From another project: `uv add --editable ../sketchkit`, or `uv add git+<repo-url>` once it is in a repo.
+From another project: `uv add --editable ../penflow`, or `uv add git+<repo-url>` once it is in a repo.
 
 ## The model
 
@@ -133,9 +158,13 @@ Re-running replaces the figures it inserted before, and keeps the file's line en
 
 ## Layers
 
-- `sketchkit.core`: the pen and the coordinate `Canvas`.
-- `sketchkit.nodes`: nodes, layout, edges, `Diagram`.
-- `sketchkit.ideas`: the shapes above.
-- `sketchkit.publish`: `Doc`, `run`, `gallery`.
+- `penflow.core`: the pen and the coordinate `Canvas`.
+- `penflow.nodes`: nodes, layout, edges, `Diagram`.
+- `penflow.ideas`: the shapes above.
+- `penflow.publish`: `Doc`, `run`, `gallery`.
+- `penflow.dsl`: Penflow fences, `parse_sketch`, `SketchDoc`.
+- `penflow.mermaid`: `convert_mermaid`.
+
+The documentation lives in [docs/](docs/README.md).
 
 Text width is estimated from a per-character table, not measured from font files. Check new diagrams with `--preview` or `--gallery`.

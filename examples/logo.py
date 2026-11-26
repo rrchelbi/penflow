@@ -1,15 +1,16 @@
-"""The sketchkit logo, drawn with sketchkit.
+"""The Penflow logo, drawn with Penflow.
 
     uv run python examples/logo.py
 """
 
+import itertools
 import math
 import pathlib
 
-from sketchkit import Canvas, Col, Diagram, Free, Label, Point, Row
+from penflow import Canvas, Col, Diagram, Free, Label, Point, Row
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DOCS = ROOT / "docs"
+ASSETS = ROOT / "docs" / "assets"
 TAGLINE = "hand-drawn diagrams from code"
 
 
@@ -37,7 +38,7 @@ def mark(cv: Canvas, x: float, y: float) -> None:
     cv.rect(x + 10, y + 80, 34, 32, "stroke", o=2, fill_cls="fill-rust")
     cv.circle(x + 104, y + 30, 18, "stroke", fill_cls="fill-cyan")
     pts = qbez((x + 42, y + 88), (x + 74, y + 84), (x + 88, y + 46))
-    for a, b in zip(pts, pts[1:]):
+    for a, b in itertools.pairwise(pts):
         cv.line(*a, *b, "stroke-accent", rough=0.55, passes=2)
     head(cv, pts[-2], pts[-1], size=15)
 
@@ -46,7 +47,7 @@ def lockup() -> Diagram:
     return Diagram(
         Row(
             Free(128, 128, mark),
-            Col(Label("sketchkit", size=76, bold=True), Label(TAGLINE, size=18, tone="cyan"), gap=4,
+            Col(Label("penflow", size=76, bold=True), Label(TAGLINE, size=18, tone="cyan"), gap=4,
                 align="start"),
             gap=24,
             align="center",
@@ -54,7 +55,7 @@ def lockup() -> Diagram:
         width=None,
         margin=26,
         seed=11,
-        title=f"sketchkit: {TAGLINE}",
+        title=f"penflow: {TAGLINE}",
     )
 
 
@@ -64,7 +65,7 @@ def square() -> Diagram:
         width=None,
         margin=18,
         seed=11,
-        title="sketchkit",
+        title="penflow",
     )
 
 
@@ -92,11 +93,11 @@ def main() -> None:
     icon_dark = restyle(icon_svg, ink="#f2efe6", soft="#9aa4b2", accent="#7c9bff",
                         surface="#1b1e24", cyan_bg="#1f7f8c", cyan_text="#48c9d9")
 
-    DOCS.mkdir(exist_ok=True)
-    (DOCS / "logo.svg").write_text(light, encoding="utf-8")
-    (DOCS / "logo-mark.svg").write_text(icon_light, encoding="utf-8")
-    (DOCS / "logo-dark.svg").write_text(dark, encoding="utf-8")
-    (DOCS / "logo-mark-dark.svg").write_text(icon_dark, encoding="utf-8")
+    ASSETS.mkdir(parents=True, exist_ok=True)
+    (ASSETS / "logo.svg").write_text(light, encoding="utf-8")
+    (ASSETS / "logo-mark.svg").write_text(icon_light, encoding="utf-8")
+    (ASSETS / "logo-dark.svg").write_text(dark, encoding="utf-8")
+    (ASSETS / "logo-mark-dark.svg").write_text(icon_dark, encoding="utf-8")
 
 
 if __name__ == "__main__":

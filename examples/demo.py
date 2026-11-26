@@ -6,7 +6,7 @@ of each idea shape. No coordinates anywhere.
 
 import pathlib
 
-from sketchkit import (
+from penflow import (
     Act,
     Arrow,
     Box,

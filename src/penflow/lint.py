@@ -98,15 +98,23 @@ def _collinear(s1: Seg, s2: Seg, tol: float = 5, min_shared: float = 12) -> bool
 
 
 def _name(n: Node) -> str:
-    return repr(n)
+    return n.origin or repr(n)
 
 
 def _edge_name(e: Edge) -> str:
+    if e.origin:
+        return e.origin
     label = getattr(e, "label", None)
     return f"{type(e).__name__}({label!r})" if label else type(e).__name__
 
 
 def lint(d: Diagram, placed: Placed) -> list[Issue]:
+    fence = d.dialect == "penflow"
+
+    def fix(python: str, dsl: str) -> str:
+        """Say the fix the way the diagram was written: Python calls, or Penflow lines."""
+        return dsl if fence else python
+
     ctx = placed.ctx
     path_of = {id(n): p for p, n in placed.nodes}
     overlays = [p for p, n in placed.nodes if isinstance(n, Overlay)]
@@ -117,15 +125,17 @@ def lint(d: Diagram, placed: Placed) -> list[Issue]:
     def under(path: str, ancestor: str) -> bool:
         return path == ancestor or path.startswith(ancestor + ".")
 
-    # -- shapes on shapes
+    # shapes on shapes
     for (pa, a), (pb, b) in itertools.combinations(leaves, 2):
         if any(under(pa, o) and under(pb, o) for o in overlays):
             continue
         if _hit(_box(a.rect, 3), _box(b.rect, 3)):
             issues.append(Issue("error", "overlap", f"{_name(a)} overlaps {_name(b)}",
-                                "give their container more gap, or put them in different rows/columns"))
+                                fix("give their container more gap, or put them in different rows/columns",
+                                    "raise the gap of the block around them ({gap: 40}), or move one into "
+                                    "another row or col")))
 
-    # -- edges through shapes
+    # edges through shapes
     for e in placed.edges:
         pts = getattr(e, "points", None)
         if pts is None:
@@ -139,32 +149,43 @@ def lint(d: Diagram, placed: Placed) -> list[Issue]:
             r = _box(n.rect, 4)
             if any(_segment_hits(a, b, r) for a, b in segs):
                 issues.append(Issue("error", "edge-crosses", f"{_edge_name(e)} passes through {_name(n)}",
-                                    "reorder the row so connected things sit next to each other, route around "
-                                    "with route='hv'/'vh' or via=[...], or start/end at a port like node.bottom"))
+                                    fix("reorder the row so connected things sit next to each other, route "
+                                        "around with route='hv'/'vh' or via=[...], or start/end at a port like "
+                                        "node.bottom",
+                                        "reorder the lines so connected things sit next to each other, add "
+                                        "{route: hv} (or vh) to the edge line, start or end at a port such as "
+                                        "a.bottom --> b, or use a flow block, which routes edges for you")))
 
-    # -- edges on top of each other
+    # edges on top of each other
     paths = [(e, list(itertools.pairwise(pts()))) for e in placed.edges if (pts := getattr(e, "points", None))]
     for (e1, s1), (e2, s2) in itertools.combinations(paths, 2):
         if any(_collinear(a, b) for a in s1 for b in s2):
             issues.append(Issue("error", "edge-overlap", f"{_edge_name(e1)} and {_edge_name(e2)} are drawn on the "
-                                "same line", "start and end them at different ports, e.g. a.at(1, 0.3) → b.at(0, 0.3) "
-                                "and b.at(0, 0.7) → a.at(1, 0.7)"))
+                                "same line", fix("start and end them at different ports, e.g. a.at(1, 0.3) → "
+                                                 "b.at(0, 0.3) and b.at(0, 0.7) → a.at(1, 0.7)",
+                                                 "start and end them at different ports: a.at(1, 0.3) --> "
+                                                 "b.at(0, 0.3) and b.at(0, 0.7) --> a.at(1, 0.7)")))
 
-    # -- edge labels on shapes and on each other
+    # edge labels on shapes and on each other
     labels = [(e, lb) for e in placed.edges if (lb := e.label_box(ctx)) is not None]
     for e, lb in labels:
         for _, n in leaves:
             if _hit(lb, _box(n.rect, 1)):
                 issues.append(Issue("error", "label-overlap", f"label of {_edge_name(e)} sits on {_name(n)}",
-                                    "widen the gap between the two shapes (flow() sizes it for you), shorten the "
-                                    "label, or move it with label_side= / label_at="))
+                                    fix("widen the gap between the two shapes (flow() sizes it for you), shorten "
+                                        "the label, or move it with label_side= / label_at=",
+                                        "widen the gap between the two shapes (a flow block sizes it for you), "
+                                        "shorten the label, or add {label_side: below} or {label_at: 0.3} to the "
+                                        "edge line")))
     for (e1, l1), (e2, l2) in itertools.combinations(labels, 2):
         if _hit(l1, l2):
             issues.append(Issue("error", "label-overlap",
                                 f"labels of {_edge_name(e1)} and {_edge_name(e2)} overlap",
-                                "move one with label_at= (0..1 along the edge) or label_side="))
+                                fix("move one with label_at= (0..1 along the edge) or label_side=",
+                                    "move one with {label_at: 0.3} (0..1 along the edge) or {label_side: below} "
+                                    "on its edge line")))
 
-    # -- text wider than its slot
+    # text wider than its slot
     for _, n in leaves:
         w = n.rect[2]
         if isinstance(n, Box):
@@ -178,26 +199,35 @@ def lint(d: Diagram, placed: Placed) -> list[Issue]:
             continue
         if need > w:
             issues.append(Issue("warn", "text-overflow", f"text of {_name(n)} needs {need:.0f}px, has {w:.0f}px",
-                                "remove the .fixed() width, shorten the text, or split it over two lines"))
+                                fix("remove the .fixed() width, shorten the text, or split it over two lines",
+                                    "remove the w: attribute, shorten the text, or split it with \\n "
+                                    "(or a[title | second line] for a box)")))
 
-    # -- whole-diagram checks
+    # whole-diagram checks
     if d.width and placed.width > d.width + 1:
         issues.append(Issue("warn", "too-wide", f"content is {placed.width:.0f}px wide, more than width={d.width:.0f}; "
                             "it will be scaled down and the text will shrink",
-                            "stack vertically (Col, flow(..., vertical=True)), use fewer items per Row, "
-                            "or shorten labels"))
+                            fix("stack vertically (Col, flow(..., vertical=True)), use fewer items per Row, "
+                                "or shorten labels",
+                                "stack vertically (col, flow td), use fewer items per row, or shorten labels")))
     if len(ctx.used) > MAX_MEANINGS:
         issues.append(Issue("warn", "too-many-tones", f"{len(ctx.used)} meanings used: {', '.join(ctx.used)}",
                             f"keep to {MAX_MEANINGS} or fewer; color only what the idea is about"))
     shapes = sum(isinstance(n, (Box, Cell, Circle)) for _, n in leaves)
     if shapes > MAX_SHAPES:
         issues.append(Issue("info", "crowded", f"{shapes} shapes in one drawing",
-                            "one drawing, one idea: split it, or group details into a Region"))
+                            fix("one drawing, one idea: split it, or group details into a Region",
+                                "one drawing, one idea: split it into two fences, or group details into a "
+                                "region")))
     if not d.title:
         issues.append(Issue("info", "no-title", "no alt text",
-                            "pass title=: one or two sentences saying what the drawing shows"))
+                            fix("pass title=: one or two sentences saying what the drawing shows",
+                                "add title: to the front matter: one or two sentences saying what the drawing "
+                                "shows")))
     if not d.headline:
         issues.append(Issue("info", "no-headline", "no takeaway line",
-                            "pass headline=: the one sentence the reader should remember"))
+                            fix("pass headline=: the one sentence the reader should remember",
+                                "add headline: to the front matter: the one sentence the reader should "
+                                "remember")))
 
     return sorted(issues, key=lambda i: _ORDER[i.level])

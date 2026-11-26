@@ -1,5 +1,5 @@
 [project]
-name = "sketchkit"
+name = "penflow"
 version = "0.0.1"
 description = "Composable hand-drawn SVG diagrams that explain one idea each"
 readme = "README.md"
@@ -9,9 +9,24 @@ authors = [
 requires-python = ">=3.11"
 dependencies = []
 
+[project.scripts]
+penflow = "penflow.cli:main"
+
 [build-system]
-requires = ["uv_build>=0.12.23,<0.13.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/penflow"]
+
+# The guide and the skill live at the top of the repository; the wheel carries copies
+# that penflow.resources reads when the package is installed.
+[tool.hatch.build.targets.wheel.force-include]
+"docs/guide.md" = "penflow/_data/docs/guide.md"
+"skills" = "penflow/_data/skills"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "docs", "skills", "tests", "examples", "README.md", "CONTRIBUTING.md", "AGENTS.md"]
 
 [dependency-groups]
 dev = [

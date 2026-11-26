@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-import sketchkit
-from sketchkit import (
+import penflow
+from penflow import (
     Arrow,
     Box,
     Col,
@@ -20,7 +20,9 @@ from sketchkit import (
     Row,
     flow,
 )
-from sketchkit.__main__ import SECTIONS, api, guide, main
+from penflow.cli import main
+from penflow.reference import SECTIONS, api
+from penflow.resources import guide
 
 BLOCKS = re.findall(r"```python\n(.*?)```", guide(), re.S)
 
@@ -45,11 +47,34 @@ def test_every_guide_example_runs_and_checks_clean(i: int) -> None:
         d.svg()
 
 
+SKETCHES = re.findall(r"```penflow\n(.*?)```", guide(), re.S)
+
+
+def test_guide_has_sketch_examples() -> None:
+    assert len(SKETCHES) >= 5
+
+
+@pytest.mark.parametrize("i", range(len(SKETCHES)))
+def test_every_guide_sketch_parses_and_checks_clean(i: int) -> None:
+    s = penflow.parse_sketch(SKETCHES[i])
+    problems = [x for x in s.diagram.check(meanings=s.settings.meanings) if x.level != "info"]
+    assert not problems, "\n".join(map(str, problems))
+    s.diagram.svg(meanings=s.settings.meanings)
+
+
+def test_skill_fence_example_parses_and_checks_clean() -> None:
+    from penflow.resources import skill
+
+    (block,) = re.findall(r"```penflow\n(.*?)```", skill(), re.S)
+    s = penflow.parse_sketch(block)
+    assert [x for x in s.diagram.check() if x.level != "info"] == []
+
+
 def test_guide_mentions_every_check_code() -> None:
     text = guide()
     from typing import get_args
 
-    from sketchkit.lint import Code
+    from penflow.lint import Code
 
     for code in get_args(Code):
         if code not in ("no-title", "no-headline", "too-many-tones", "crowded"):
@@ -58,14 +83,14 @@ def test_guide_mentions_every_check_code() -> None:
 
 # ---------------------------------------------------------------- api
 def test_api_lists_every_public_callable() -> None:
-    """Every class and function sketchkit defines and exports appears in `python -m sketchkit api`."""
+    """Every class and function penflow defines and exports appears in `python -m penflow api`."""
     import inspect
 
     listed = {n for names in SECTIONS.values() for n in names}
     base_classes = {"Node", "Edge", "LaneRow", "Rendered"}
-    public = {n for n in sketchkit.__all__
-              if (inspect.isclass(obj := getattr(sketchkit, n)) or inspect.isfunction(obj))
-              and getattr(obj, "__module__", "").startswith("sketchkit")}
+    public = {n for n in penflow.__all__
+              if (inspect.isclass(obj := getattr(penflow, n)) or inspect.isfunction(obj))
+              and getattr(obj, "__module__", "").startswith("penflow")}
     assert public - base_classes <= listed, public - base_classes - listed
 
 
@@ -155,7 +180,7 @@ def _script(tmp_path: pathlib.Path, body: str) -> pathlib.Path:
     (tmp_path / "post.md").write_text("<!-- sketch: x -->\n", encoding="utf-8")
     script = tmp_path / "diagrams.py"
     script.write_text(
-        "import pathlib\nfrom sketchkit import *\n"
+        "import pathlib\nfrom penflow import *\n"
         "doc = Doc(pathlib.Path(__file__).parent / 'post.md')\n"
         "@doc.diagram('x', 'cap')\n"
         f"def x() -> Diagram:\n    {body}\n"
@@ -198,22 +223,22 @@ def test_doc_check_and_run_flag(tmp_path: pathlib.Path, capsys: pytest.CaptureFi
     doc = Doc(md)
     doc.diagram("a", "cap")(lambda: Diagram(Box("x").fixed(w=10), headline="h", title="t"))
     assert [i.code for _, i in doc.check()] == ["text-overflow"]
-    sketchkit.run(doc, argv=["--check", "--no-write"])
+    penflow.run(doc, argv=["--check", "--no-write"])
     assert "text-overflow" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------- skill
 def test_skill_has_frontmatter_and_uses_real_commands() -> None:
-    from sketchkit.__main__ import skill
+    from penflow.resources import skill
 
     text = skill()
-    assert text.startswith("---\nname: sketch-diagrams\ndescription: ")
-    for cmd in re.findall(r"python -m sketchkit (\w+)", text):
-        assert cmd in {"guide", "api", "check", "skill"}, cmd
+    assert text.startswith("---\nname: penflow-diagrams\ndescription: ")
+    for cmd in re.findall(r"python -m penflow (\w+)", text):
+        assert cmd in {"guide", "api", "check", "render", "convert", "skill"}, cmd
 
 
 def test_skill_install_refuses_to_clobber_edits(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
-    target = tmp_path / "sketch-diagrams" / "SKILL.md"
+    target = tmp_path / "penflow-diagrams" / "SKILL.md"
     assert main(["skill", "--install", str(tmp_path)]) == 0
     assert main(["skill", "--install", str(tmp_path)]) == 0  # same content: fine
     target.write_text("my edits", encoding="utf-8")
