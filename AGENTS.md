@@ -14,10 +14,12 @@ uv sync                                    # .venv with the dev tools
 uv run pytest                              # tests, including every example in docs/guide.md
 uv run mypy                                # strict
 uv run pyright                             # strict
+uv run ruff check                          # lint; rules in pyproject.toml
 uv run python -m penflow check examples/demo.py --gallery out/check.html
+uv run python -m penflow check examples/demo_penflow.md
 ```
 
-Run all four checks (pytest, mypy, pyright, and `check` on the demo) before calling a change done. If you're running from `write-ups/`, add `--directory penflow` after `uv run` so the tools find this project's settings.
+Run all of these before calling a change done; CI (`.github/workflows/ci.yml`) runs the same on every pull request, on Python 3.11 to 3.14. If you're running from the folder above this project, add `--directory <this folder>` after `uv run` so the tools find this project's settings.
 
 ## Layout of the code
 

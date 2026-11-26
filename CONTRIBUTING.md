@@ -20,15 +20,17 @@ uv sync            # creates .venv with pytest, mypy and pyright
 
 Requires Python 3.11 or newer.
 
-## The four checks
+## The checks
 
-Run all of these before opening a pull request. A change isn't done until they all pass.
+Run all of these before opening a pull request. A change isn't done until they all pass. CI runs the same checks on every pull request: the tests on Python 3.11 to 3.14 on Linux and on Windows, the rest once, plus a build of the wheel.
 
 ```bash
-uv run pytest                                                         # tests, including every code block in guide.md
+uv run pytest                                                         # tests, including every example in docs/guide.md
 uv run mypy                                                           # strict
 uv run pyright                                                        # strict
+uv run ruff check                                                     # lint; the rules are in pyproject.toml
 uv run python -m penflow check examples/demo.py --gallery out/check.html
+uv run python -m penflow check examples/demo_penflow.md
 ```
 
 Then open `out/check.html` and look at the diagrams. Text widths are estimated rather than measured, so the checker can't catch everything. If your change affects drawing, say in the pull request which diagrams you looked at.
@@ -58,4 +60,4 @@ Then open `out/check.html` and look at the diagrams. Text widths are estimated r
 
 ## Using an AI agent
 
-You're welcome to. `CLAUDE.md` imports `AGENTS.md`, so Claude Code picks up the rules above automatically. You're still responsible for the change: run the four checks and look at the output yourself.
+You're welcome to. `CLAUDE.md` imports `AGENTS.md`, so Claude Code picks up the rules above automatically. You're still responsible for the change: run the checks and look at the output yourself.
